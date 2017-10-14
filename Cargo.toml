@@ -1,0 +1,15 @@
+[package]
+name = "graphic"
+version = "0.0.1-alpha.0"
+authors = ["Amr Hassan <amr.hassan@gmail.com>"]
+description = "In-memory graph data structures and some of its operations"
+license = "MIT"
+
+[dependencies]
+
+[dev-dependencies]
+quickcheck = "0.4"
+quickcheck_macros = "0.4"
+
+[badges]
+travis-ci = { repository = "amrhassan/rust-graphic" }
