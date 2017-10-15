@@ -14,7 +14,8 @@ struct Incidence {
 
 struct Vertex<A> {
     value: A,
-    adjacents: Vec<Incidence>
+    adjacents: Vec<Incidence>,
+    id: VertexId
 }
 
 struct DirectedGraph<A> {
@@ -39,8 +40,9 @@ impl <A> DirectedGraph<A> {
 
     /// Retrieves the vertex value from the graph
     pub fn add_vertex(&mut self, value: A) -> VertexId {
-        self.vertices.push(Vertex { value: value, adjacents: Vec::new() });
-        VertexId { value: self.vertices.len()-1 }
+        let id = VertexId { value: self.vertices.len() };
+        self.vertices.push(Vertex { value: value, adjacents: Vec::new(), id: id });
+        id
     }
 
     /// Connects two vertices
@@ -59,12 +61,11 @@ impl <A> DirectedGraph<A> {
 impl <A : fmt::Display> fmt::Display for DirectedGraph<A> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let _ = writeln!(f, "Graph of {} vertices:", self.vertices.len());
-        for (vertex, vertex_id) in self.vertices.iter().zip(0..) {
+        for vertex in self.vertices.iter() {
             for incidence in vertex.adjacents.iter() {
-                let from_vertex_id = VertexId { value: vertex_id };
                 let _ = writeln!(f, "\t ({}:{}) -(weight: {})-> ({}:{})",
-                                 from_vertex_id,
-                                 self.vertex_value(from_vertex_id).expect("Failed to get vertex value"),
+                                 vertex.id,
+                                 self.vertex_value(vertex.id).expect("Failed to get vertex value"),
                                  incidence.weight,
                                  incidence.other,
                                  self.vertex_value(incidence.other).expect("Failed to get vertex value"));
@@ -126,7 +127,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
+    fn undirected_construction() {
 
         let mut graph = UndirectedGraph::new();
 
