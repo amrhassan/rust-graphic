@@ -1,15 +1,17 @@
 
 use std::fmt;
 use std::result;
+use std::collections::VecDeque;
 
 pub type Result = result::Result<(), String>;
 
 #[derive(Debug, Copy, Clone)]
 pub struct VertexId { value: usize }
 
+#[derive(Debug, Copy, Clone)]
 struct Incidence {
     other: VertexId,
-    weight: f64
+    weight: u64
 }
 
 struct Vertex<A> {
@@ -46,7 +48,7 @@ impl <A> DirectedGraph<A> {
     }
 
     /// Connects two vertices
-    pub fn connect(&mut self, from: VertexId, to: VertexId, weight: f64) -> Result {
+    pub fn connect(&mut self, from: VertexId, to: VertexId, weight: u64) -> Result {
         match self.vertices.get_mut(from.value) {
             Some(vertex) => {
                 let incident = Incidence { other: to, weight: weight };
@@ -54,6 +56,97 @@ impl <A> DirectedGraph<A> {
                 Ok(())
             },
             None => Err(format!("{:?} does not exist", from))
+        }
+    }
+
+    /// Iterate over values in breadth-first order
+    fn breadth_first_iter(&self, from: VertexId) -> BFDirectedGraphIterator<A> {
+        let mut visited = Vec::new();
+        let mut q = VecDeque::new();
+
+        visited.resize(self.vertices.len(), false);
+
+        q.push_back(Incidence { other: from, weight: 0 });
+
+        BFDirectedGraphIterator {
+            graph: self,
+            visited: visited,
+            q: q
+        }
+    }
+
+    /// Iterate over values in depth-first order
+    fn depth_first_iter(&self, from: VertexId) -> DFDirectedGraphIterator<A> {
+
+        let mut visited = Vec::new();
+        let mut stack = Vec::new();
+
+        visited.resize(self.vertices.len(), false);
+
+        stack.push(Incidence { other: from, weight: 0 });
+
+        DFDirectedGraphIterator {
+            graph: self,
+            visited: visited,
+            stack: stack
+        }
+    }
+}
+
+/// Breadth-first Graph Iterator
+struct BFDirectedGraphIterator<'a, A : 'a> {
+    graph: &'a DirectedGraph<A>,
+    visited: Vec<bool>,
+    q: VecDeque<Incidence>
+}
+
+impl <'a, A> Iterator for BFDirectedGraphIterator<'a, A> {
+    type Item = &'a A;
+    fn next(&mut self) -> Option<&'a A> {
+        match self.q.pop_front() {
+            Some(incidence) if self.visited[incidence.other.value] => {
+                self.next()
+            },
+            Some(incidence) => {
+                let vertex = &self.graph.vertices[incidence.other.value];
+                let mut sorted_adjacents = vertex.adjacents.clone();
+                sorted_adjacents.sort_unstable_by_key(|adjacent| adjacent.weight);
+                for adjacent in sorted_adjacents {
+                    self.q.push_back(adjacent);
+                }
+                self.visited[incidence.other.value] = true;
+                Some(&vertex.value)
+            },
+            _ => None
+        }
+    }
+}
+
+/// Depth-first Graph Iterator
+struct DFDirectedGraphIterator<'a, A : 'a> {
+    graph: &'a DirectedGraph<A>,
+    visited: Vec<bool>,
+    stack: Vec<Incidence>
+}
+
+impl <'a, A> Iterator for DFDirectedGraphIterator<'a, A> {
+    type Item = &'a A;
+    fn next(&mut self) -> Option<&'a A> {
+        match self.stack.pop() {
+            Some(incidence) if self.visited[incidence.other.value] => {
+                self.next()
+            },
+            Some(incidence) => {
+                let vertex = &self.graph.vertices[incidence.other.value];
+                let mut sorted_adjacents = vertex.adjacents.clone();
+                sorted_adjacents.sort_unstable_by_key(|adjacent| adjacent.weight);
+                for adjacent in sorted_adjacents {
+                    self.stack.push(adjacent);
+                }
+                self.visited[incidence.other.value] = true;
+                Some(&vertex.value)
+            },
+            _ => None
         }
     }
 }
@@ -88,7 +181,7 @@ struct UndirectedGraph<A> {
 impl <A> UndirectedGraph<A> {
 
     /// Connects two vertices bidirectionally
-    pub fn connect_undirected(&mut self, one: VertexId, other: VertexId, weight: f64) -> Result {
+    pub fn connect_undirected(&mut self, one: VertexId, other: VertexId, weight: u64) -> Result {
         match self.directed.connect(one, other, weight) {
             Ok(()) => self.directed.connect(other, one, weight),
             err => err
@@ -127,25 +220,46 @@ mod tests {
     use super::*;
 
     #[test]
-    fn undirected_construction() {
+    fn bf_iter() {
+        let mut graph = DirectedGraph::new();
 
-        let mut graph = UndirectedGraph::new();
+        let zero = graph.add_vertex("zero".to_string());
+        let one = graph.add_vertex("one".to_string());
+        let two = graph.add_vertex("two".to_string());
+        let three = graph.add_vertex("three".to_string());
 
-        let zero = graph.add_vertex("zero");
-        let one = graph.add_vertex("one");
-        let two = graph.add_vertex("two");
-        let three = graph.add_vertex("three");
-        let four = graph.add_vertex("four");
+        let _ = graph.connect(zero, one, 1);
+        let _ = graph.connect(zero, two, 1);
+        let _ = graph.connect(one, two, 1);
+        let _ = graph.connect(two, zero, 1);
+        let _ = graph.connect(two, three, 1);
+        let _ = graph.connect(three, three, 1);
 
-        graph.connect_undirected(zero, one, 0.1);
-        graph.connect_undirected(zero, four, 0.2);
-        graph.connect_undirected(one, two, 0.3);
-        graph.connect_undirected(one, three, 0.5);
-        graph.connect_undirected(one, four, 0.6);
-        graph.connect_undirected(two, three, 0.7);
-        graph.connect_undirected(two, four, 0.8);
+        assert_eq!(
+            graph.breadth_first_iter(two).collect::<Vec<&String>>(),
+            vec!["two", "zero", "three", "one"]
+        )
+    }
 
-        println!("{}", graph);
-        assert!(false)
+    #[test]
+    fn df_iter() {
+        let mut graph = DirectedGraph::new();
+
+        let zero = graph.add_vertex("zero".to_string());
+        let one = graph.add_vertex("one".to_string());
+        let two = graph.add_vertex("two".to_string());
+        let three = graph.add_vertex("three".to_string());
+
+        let _ = graph.connect(zero, one, 0);
+        let _ = graph.connect(zero, two, 0);
+        let _ = graph.connect(one, two, 0);
+        let _ = graph.connect(two, zero, 1);
+        let _ = graph.connect(two, three, 0);
+        let _ = graph.connect(three, three, 0);
+
+        assert_eq!(
+            graph.depth_first_iter(two).collect::<Vec<&String>>(),
+            vec!["two", "zero", "one", "three"]
+        )
     }
 }
