@@ -9,12 +9,12 @@ pub type Result = result::Result<(), String>;
 pub struct VertexId { value: usize }
 
 #[derive(Debug, Copy, Clone)]
-struct Incidence {
+pub struct Incidence {
     other: VertexId,
     weight: u64
 }
 
-struct Vertex<A> {
+pub struct Vertex<A> {
     value: A,
     adjacents: Vec<Incidence>,
     id: VertexId
@@ -118,6 +118,20 @@ impl <A> DirectedGraph<A> {
             }
             return false;
         }
+    }
+
+    /// The out-degree of a vertex
+    pub fn out_degree(&self, vertex_id: VertexId) -> usize {
+        self.vertices[vertex_id.value].adjacents.len()
+    }
+
+    /// The in-degree of a vertex
+    pub fn in_degree(&self, vertex_id: VertexId) -> usize {
+        self.vertices
+            .iter()
+            .flat_map(|vertex| vertex.adjacents.iter())
+            .filter(|incidence| incidence.other == vertex_id)
+            .count()
     }
 }
 
@@ -314,7 +328,7 @@ mod tests {
 
         assert!(graph.is_empty());
 
-        let three = graph.add_vertex("three".to_string());
+        let _ = graph.add_vertex("three".to_string());
 
         assert!(!graph.is_empty())
     }
@@ -339,5 +353,30 @@ mod tests {
         let _ = graph.connect(two, zero, 0);
 
         assert!(graph.is_cyclic())
+    }
+
+    #[test]
+    fn out_and_in_degrees() {
+
+        let mut graph = DirectedGraph::new();
+
+        let zero = graph.add_vertex("zero".to_string());
+        let one = graph.add_vertex("one".to_string());
+        let two = graph.add_vertex("two".to_string());
+        let three = graph.add_vertex("three".to_string());
+
+        let _ = graph.connect(zero, one, 0);
+        let _ = graph.connect(zero, two, 0);
+        let _ = graph.connect(one, two, 0);
+        let _ = graph.connect(two, zero, 1);
+        let _ = graph.connect(two, three, 0);
+        let _ = graph.connect(three, three, 0);
+
+        assert_eq!(graph.in_degree(two), 2);
+        assert_eq!(graph.out_degree(two), 2);
+        assert_eq!(graph.in_degree(one), 1);
+        assert_eq!(graph.out_degree(one), 1);
+        assert_eq!(graph.in_degree(three), 2);
+        assert_eq!(graph.out_degree(three), 1);
     }
 }
