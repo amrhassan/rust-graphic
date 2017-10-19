@@ -5,39 +5,54 @@ use std::collections::VecDeque;
 
 pub type Result = result::Result<(), String>;
 
+/// A unique identifier for a vertex within a graph
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct VertexId { value: usize }
 
+/// A directed edge from a Vertex pointing to another
 #[derive(Debug, Copy, Clone)]
 pub struct Incidence {
     other: VertexId,
     weight: u64
 }
 
+/// A vertex in a graph
 pub struct Vertex<A> {
     value: A,
     adjacents: Vec<Incidence>,
     id: VertexId
 }
 
-struct DirectedGraph<A> {
+/// A directed graph
+pub struct DirectedGraph<A> {
     vertices: Vec<Vertex<A>>
 }
 
 impl <A> DirectedGraph<A> {
 
+    /// Constructs a new empty directed graph
     pub fn new() -> DirectedGraph<A> {
         DirectedGraph { vertices: Vec::new() }
     }
 
+    /// Retrieves the vertex at the given id
+    pub fn vertex(&self, id: VertexId) -> Option<&Vertex<A>> {
+        self.vertices.get(id.value)
+    }
+
+    /// Retrieves the vertex at the given id
+    pub fn vertex_mut(&mut self, id: VertexId) -> Option<&mut Vertex<A>> {
+        self.vertices.get_mut(id.value)
+    }
+
     /// Retrieves a vertex value
     pub fn vertex_value(&self, id: VertexId) -> Option<&A> {
-        self.vertices.get(id.value).map(|vertex| &vertex.value)
+        self.vertex(id).map(|vertex| &vertex.value)
     }
 
     /// Retrieves a vertex value
     pub fn vertex_value_mut(&mut self, id: VertexId) -> Option<&mut A> {
-        self.vertices.get_mut(id.value).map(|vertex| &mut vertex.value)
+        self.vertex_mut(id).map(|vertex| &mut vertex.value)
     }
 
     /// Retrieves the vertex value from the graph
@@ -136,7 +151,7 @@ impl <A> DirectedGraph<A> {
 }
 
 /// Breadth-first Graph Iterator
-struct BFDirectedGraphIterator<'a, A : 'a> {
+pub struct BFDirectedGraphIterator<'a, A : 'a> {
     graph: &'a DirectedGraph<A>,
     visited: Vec<bool>,
     q: VecDeque<Incidence>
@@ -165,7 +180,7 @@ impl <'a, A> Iterator for BFDirectedGraphIterator<'a, A> {
 }
 
 /// Depth-first Graph Iterator
-struct DFDirectedGraphIterator<'a, A : 'a> {
+pub struct DFDirectedGraphIterator<'a, A : 'a> {
     graph: &'a DirectedGraph<A>,
     visited: Vec<bool>,
     stack: Vec<Incidence>
@@ -194,7 +209,7 @@ impl <'a, A> Iterator for DFDirectedGraphIterator<'a, A> {
 }
 
 /// Depth-first Graph Iterator
-struct DFDirectedGraphValueIterator<'a, A : 'a> {
+pub struct DFDirectedGraphValueIterator<'a, A : 'a> {
     iter: DFDirectedGraphIterator<'a, A>
 }
 
@@ -228,7 +243,8 @@ impl fmt::Display for VertexId {
     }
 }
 
-struct UndirectedGraph<A> {
+/// An undirected graph
+pub struct UndirectedGraph<A> {
     directed: DirectedGraph<A>
 }
 
