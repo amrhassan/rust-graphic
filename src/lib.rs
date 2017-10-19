@@ -5,7 +5,7 @@ use std::collections::VecDeque;
 
 pub type Result = result::Result<(), String>;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct VertexId { value: usize }
 
 #[derive(Debug, Copy, Clone)]
@@ -60,7 +60,7 @@ impl <A> DirectedGraph<A> {
     }
 
     /// Iterate over values in breadth-first order
-    fn breadth_first_iter(&self, from: VertexId) -> BFDirectedGraphIterator<A> {
+    pub fn breadth_first_iter(&self, from: VertexId) -> BFDirectedGraphIterator<A> {
         let mut visited = Vec::new();
         let mut q = VecDeque::new();
 
@@ -76,7 +76,11 @@ impl <A> DirectedGraph<A> {
     }
 
     /// Iterate over values in depth-first order
-    fn depth_first_iter(&self, from: VertexId) -> DFDirectedGraphIterator<A> {
+    pub fn depth_first_values_iter(&self, from: VertexId) -> DFDirectedGraphValueIterator<A> {
+        DFDirectedGraphValueIterator { iter: self.depth_first_iter(from) }
+    }
+
+    pub fn depth_first_iter(&self, from: VertexId) -> DFDirectedGraphIterator<A> {
 
         let mut visited = Vec::new();
         let mut stack = Vec::new();
@@ -89,6 +93,30 @@ impl <A> DirectedGraph<A> {
             graph: self,
             visited: visited,
             stack: stack
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.vertices.is_empty()
+    }
+
+    /// Checks if the graph is cyclic
+    fn is_cyclic(&self) -> bool {
+        if self.is_empty() {
+            false
+        } else {
+            let head = &self.vertices[0];
+            for vertex in self.depth_first_iter(head.id) {
+                for incidence in &vertex.adjacents {
+                    let other_vertex = &self.vertices[incidence.other.value];
+                    for reverse_incidence in &other_vertex.adjacents {
+                        if reverse_incidence.other == vertex.id {
+                            return true
+                        }
+                    }
+                }
+            }
+            return false;
         }
     }
 }
@@ -130,8 +158,8 @@ struct DFDirectedGraphIterator<'a, A : 'a> {
 }
 
 impl <'a, A> Iterator for DFDirectedGraphIterator<'a, A> {
-    type Item = &'a A;
-    fn next(&mut self) -> Option<&'a A> {
+    type Item = &'a Vertex<A>;
+    fn next(&mut self) -> Option<&'a Vertex<A>> {
         match self.stack.pop() {
             Some(incidence) if self.visited[incidence.other.value] => {
                 self.next()
@@ -144,10 +172,22 @@ impl <'a, A> Iterator for DFDirectedGraphIterator<'a, A> {
                     self.stack.push(adjacent);
                 }
                 self.visited[incidence.other.value] = true;
-                Some(&vertex.value)
+                Some(&vertex)
             },
             _ => None
         }
+    }
+}
+
+/// Depth-first Graph Iterator
+struct DFDirectedGraphValueIterator<'a, A : 'a> {
+    iter: DFDirectedGraphIterator<'a, A>
+}
+
+impl <'a, A> Iterator for DFDirectedGraphValueIterator<'a, A> {
+    type Item = &'a A;
+    fn next(&mut self) -> Option<&'a A> {
+        self.iter.next().map(|vertex| &vertex.value)
     }
 }
 
@@ -206,6 +246,10 @@ impl <A> UndirectedGraph<A> {
     pub fn add_vertex(&mut self, value: A) -> VertexId {
         self.directed.add_vertex(value)
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.directed.is_empty()
+    }
 }
 
 impl <A: fmt::Display> fmt::Display for UndirectedGraph<A> {
@@ -258,8 +302,42 @@ mod tests {
         let _ = graph.connect(three, three, 0);
 
         assert_eq!(
-            graph.depth_first_iter(two).collect::<Vec<&String>>(),
+            graph.depth_first_values_iter(two).collect::<Vec<&String>>(),
             vec!["two", "zero", "one", "three"]
         )
+    }
+
+    #[test]
+    fn is_empty() {
+
+        let mut graph = DirectedGraph::new();
+
+        assert!(graph.is_empty());
+
+        let three = graph.add_vertex("three".to_string());
+
+        assert!(!graph.is_empty())
+    }
+
+    #[test]
+    fn is_cyclic() {
+
+        let mut graph = DirectedGraph::new();
+
+        let zero = graph.add_vertex("zero".to_string());
+        let one = graph.add_vertex("one".to_string());
+        let two = graph.add_vertex("two".to_string());
+        let three = graph.add_vertex("three".to_string());
+
+        let _ = graph.connect(zero, one, 0);
+        let _ = graph.connect(zero, two, 0);
+        let _ = graph.connect(one, two, 0);
+        let _ = graph.connect(two, three, 0);
+
+        assert!(!graph.is_cyclic());
+
+        let _ = graph.connect(two, zero, 0);
+
+        assert!(graph.is_cyclic())
     }
 }
