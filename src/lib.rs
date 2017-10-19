@@ -116,7 +116,7 @@ impl <A> DirectedGraph<A> {
     }
 
     /// Checks if the graph is cyclic
-    fn is_cyclic(&self) -> bool {
+    pub fn is_cyclic(&self) -> bool {
         if self.is_empty() {
             false
         } else {
