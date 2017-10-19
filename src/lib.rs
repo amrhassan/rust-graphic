@@ -19,7 +19,8 @@ pub struct Arc {
 /// A vertex in a graph
 pub struct Vertex<A> {
     value: A,
-    arcs: Vec<Arc>,
+    arcs_in: Vec<Arc>,
+    arcs_out: Vec<Arc>,
     id: VertexId
 }
 
@@ -58,20 +59,31 @@ impl <A> DirectedGraph<A> {
     /// Retrieves the vertex value from the graph
     pub fn add_vertex(&mut self, value: A) -> VertexId {
         let id = VertexId { value: self.vertices.len() };
-        self.vertices.push(Vertex { value: value, arcs: Vec::new(), id: id });
+        self.vertices.push(Vertex { value: value, arcs_out: Vec::new(), arcs_in: Vec::new(), id: id });
         id
     }
 
     /// Connects two vertices
     pub fn connect(&mut self, from: VertexId, to: VertexId, weight: u64) -> Result {
-        match self.vertices.get_mut(from.value) {
-            Some(vertex) => {
-                let arc = Arc { other: to, weight: weight };
-                vertex.arcs.push(arc);
-                Ok(())
-            },
-            None => Err(format!("{:?} does not exist", from))
+        {
+            match self.vertex_mut(from) {
+                Some(from_vertex) => {
+                    let arc = Arc { other: to, weight: weight };
+                    from_vertex.arcs_out.push(arc);
+                },
+                None => return Err(format!("{:?} does not exist", from))
+            }
         }
+        {
+            match self.vertex_mut(to) {
+                Some(to_vertex) => {
+                    let arc = Arc { other: from, weight: weight };
+                    to_vertex.arcs_in.push(arc);
+                },
+                None => return Err(format!("{:?} does not exist", from))
+            }
+        }
+        Ok(())
     }
 
     /// Iterate over values in breadth-first order
@@ -122,9 +134,9 @@ impl <A> DirectedGraph<A> {
         } else {
             let head = &self.vertices[0];
             for vertex in self.depth_first_iter(head.id) {
-                for arc in &vertex.arcs {
+                for arc in &vertex.arcs_out {
                     let other_vertex = &self.vertices[arc.other.value];
-                    for reverse_arc in &other_vertex.arcs {
+                    for reverse_arc in &other_vertex.arcs_out {
                         if reverse_arc.other == vertex.id {
                             return true
                         }
@@ -136,17 +148,17 @@ impl <A> DirectedGraph<A> {
     }
 
     /// The out-degree of a vertex
-    pub fn out_degree(&self, vertex_id: VertexId) -> usize {
-        self.vertices[vertex_id.value].arcs.len()
+    pub fn out_degree(&self, vertex_id: VertexId) -> Option<usize> {
+        self.vertex(vertex_id).map(|vertex| vertex.arcs_out.len())
     }
 
     /// The in-degree of a vertex
-    pub fn in_degree(&self, vertex_id: VertexId) -> usize {
-        self.vertices
-            .iter()
-            .flat_map(|vertex| vertex.arcs.iter())
-            .filter(|arc| arc.other == vertex_id)
-            .count()
+    pub fn in_degree(&self, vertex_id: VertexId) -> Option<usize> {
+        self.vertex(vertex_id).map(|vertex| vertex.arcs_in.len())
+    }
+
+    fn topologically_sorted(&self) -> Vec<VertexId> {
+        panic!("TODO")
     }
 }
 
@@ -166,7 +178,7 @@ impl <'a, A> Iterator for BFDirectedGraphIterator<'a, A> {
             },
             Some(arc) => {
                 let vertex = &self.graph.vertices[arc.other.value];
-                let mut sorted_arcs = vertex.arcs.clone();
+                let mut sorted_arcs = vertex.arcs_out.clone();
                 sorted_arcs.sort_unstable_by_key(|arc| arc.weight);
                 for arc in sorted_arcs {
                     self.q.push_back(arc);
@@ -195,7 +207,7 @@ impl <'a, A> Iterator for DFDirectedGraphIterator<'a, A> {
             },
             Some(arc) => {
                 let vertex = &self.graph.vertices[arc.other.value];
-                let mut sorted_arcs = vertex.arcs.clone();
+                let mut sorted_arcs = vertex.arcs_out.clone();
                 sorted_arcs.sort_unstable_by_key(|arc| arc.weight);
                 for arc in sorted_arcs {
                     self.stack.push(arc);
@@ -224,7 +236,7 @@ impl <A : fmt::Display> fmt::Display for DirectedGraph<A> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let _ = writeln!(f, "Graph of {} vertices:", self.vertices.len());
         for vertex in self.vertices.iter() {
-            for arc in vertex.arcs.iter() {
+            for arc in vertex.arcs_out.iter() {
                 let _ = writeln!(f, "\t ({}:{}) -(weight: {})-> ({}:{})",
                                  vertex.id,
                                  self.vertex_value(vertex.id).expect("Failed to get vertex value"),
@@ -280,6 +292,7 @@ impl <A> UndirectedGraph<A> {
     pub fn is_empty(&self) -> bool {
         self.directed.is_empty()
     }
+
 }
 
 impl <A: fmt::Display> fmt::Display for UndirectedGraph<A> {
@@ -388,11 +401,11 @@ mod tests {
         let _ = graph.connect(two, three, 0);
         let _ = graph.connect(three, three, 0);
 
-        assert_eq!(graph.in_degree(two), 2);
-        assert_eq!(graph.out_degree(two), 2);
-        assert_eq!(graph.in_degree(one), 1);
-        assert_eq!(graph.out_degree(one), 1);
-        assert_eq!(graph.in_degree(three), 2);
-        assert_eq!(graph.out_degree(three), 1);
+        assert_eq!(graph.in_degree(two), Some(2));
+        assert_eq!(graph.out_degree(two), Some(2));
+        assert_eq!(graph.in_degree(one), Some(1));
+        assert_eq!(graph.out_degree(one), Some(1));
+        assert_eq!(graph.in_degree(three), Some(2));
+        assert_eq!(graph.out_degree(three), Some(1));
     }
 }
