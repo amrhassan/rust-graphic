@@ -11,7 +11,7 @@ pub struct VertexId { value: usize }
 
 /// A directed edge from a Vertex pointing to another
 #[derive(Debug, Copy, Clone)]
-pub struct Incidence {
+pub struct Arc {
     other: VertexId,
     weight: u64
 }
@@ -19,7 +19,7 @@ pub struct Incidence {
 /// A vertex in a graph
 pub struct Vertex<A> {
     value: A,
-    adjacents: Vec<Incidence>,
+    arcs: Vec<Arc>,
     id: VertexId
 }
 
@@ -58,7 +58,7 @@ impl <A> DirectedGraph<A> {
     /// Retrieves the vertex value from the graph
     pub fn add_vertex(&mut self, value: A) -> VertexId {
         let id = VertexId { value: self.vertices.len() };
-        self.vertices.push(Vertex { value: value, adjacents: Vec::new(), id: id });
+        self.vertices.push(Vertex { value: value, arcs: Vec::new(), id: id });
         id
     }
 
@@ -66,8 +66,8 @@ impl <A> DirectedGraph<A> {
     pub fn connect(&mut self, from: VertexId, to: VertexId, weight: u64) -> Result {
         match self.vertices.get_mut(from.value) {
             Some(vertex) => {
-                let incident = Incidence { other: to, weight: weight };
-                vertex.adjacents.push(incident);
+                let arc = Arc { other: to, weight: weight };
+                vertex.arcs.push(arc);
                 Ok(())
             },
             None => Err(format!("{:?} does not exist", from))
@@ -81,7 +81,7 @@ impl <A> DirectedGraph<A> {
 
         visited.resize(self.vertices.len(), false);
 
-        q.push_back(Incidence { other: from, weight: 0 });
+        q.push_back(Arc { other: from, weight: 0 });
 
         BFDirectedGraphIterator {
             graph: self,
@@ -102,7 +102,7 @@ impl <A> DirectedGraph<A> {
 
         visited.resize(self.vertices.len(), false);
 
-        stack.push(Incidence { other: from, weight: 0 });
+        stack.push(Arc { other: from, weight: 0 });
 
         DFDirectedGraphIterator {
             graph: self,
@@ -122,10 +122,10 @@ impl <A> DirectedGraph<A> {
         } else {
             let head = &self.vertices[0];
             for vertex in self.depth_first_iter(head.id) {
-                for incidence in &vertex.adjacents {
-                    let other_vertex = &self.vertices[incidence.other.value];
-                    for reverse_incidence in &other_vertex.adjacents {
-                        if reverse_incidence.other == vertex.id {
+                for arc in &vertex.arcs {
+                    let other_vertex = &self.vertices[arc.other.value];
+                    for reverse_arc in &other_vertex.arcs {
+                        if reverse_arc.other == vertex.id {
                             return true
                         }
                     }
@@ -137,15 +137,15 @@ impl <A> DirectedGraph<A> {
 
     /// The out-degree of a vertex
     pub fn out_degree(&self, vertex_id: VertexId) -> usize {
-        self.vertices[vertex_id.value].adjacents.len()
+        self.vertices[vertex_id.value].arcs.len()
     }
 
     /// The in-degree of a vertex
     pub fn in_degree(&self, vertex_id: VertexId) -> usize {
         self.vertices
             .iter()
-            .flat_map(|vertex| vertex.adjacents.iter())
-            .filter(|incidence| incidence.other == vertex_id)
+            .flat_map(|vertex| vertex.arcs.iter())
+            .filter(|arc| arc.other == vertex_id)
             .count()
     }
 }
@@ -154,24 +154,24 @@ impl <A> DirectedGraph<A> {
 pub struct BFDirectedGraphIterator<'a, A : 'a> {
     graph: &'a DirectedGraph<A>,
     visited: Vec<bool>,
-    q: VecDeque<Incidence>
+    q: VecDeque<Arc>
 }
 
 impl <'a, A> Iterator for BFDirectedGraphIterator<'a, A> {
     type Item = &'a A;
     fn next(&mut self) -> Option<&'a A> {
         match self.q.pop_front() {
-            Some(incidence) if self.visited[incidence.other.value] => {
+            Some(arc) if self.visited[arc.other.value] => {
                 self.next()
             },
-            Some(incidence) => {
-                let vertex = &self.graph.vertices[incidence.other.value];
-                let mut sorted_adjacents = vertex.adjacents.clone();
-                sorted_adjacents.sort_unstable_by_key(|adjacent| adjacent.weight);
-                for adjacent in sorted_adjacents {
-                    self.q.push_back(adjacent);
+            Some(arc) => {
+                let vertex = &self.graph.vertices[arc.other.value];
+                let mut sorted_arcs = vertex.arcs.clone();
+                sorted_arcs.sort_unstable_by_key(|arc| arc.weight);
+                for arc in sorted_arcs {
+                    self.q.push_back(arc);
                 }
-                self.visited[incidence.other.value] = true;
+                self.visited[arc.other.value] = true;
                 Some(&vertex.value)
             },
             _ => None
@@ -183,24 +183,24 @@ impl <'a, A> Iterator for BFDirectedGraphIterator<'a, A> {
 pub struct DFDirectedGraphIterator<'a, A : 'a> {
     graph: &'a DirectedGraph<A>,
     visited: Vec<bool>,
-    stack: Vec<Incidence>
+    stack: Vec<Arc>
 }
 
 impl <'a, A> Iterator for DFDirectedGraphIterator<'a, A> {
     type Item = &'a Vertex<A>;
     fn next(&mut self) -> Option<&'a Vertex<A>> {
         match self.stack.pop() {
-            Some(incidence) if self.visited[incidence.other.value] => {
+            Some(arc) if self.visited[arc.other.value] => {
                 self.next()
             },
-            Some(incidence) => {
-                let vertex = &self.graph.vertices[incidence.other.value];
-                let mut sorted_adjacents = vertex.adjacents.clone();
-                sorted_adjacents.sort_unstable_by_key(|adjacent| adjacent.weight);
-                for adjacent in sorted_adjacents {
-                    self.stack.push(adjacent);
+            Some(arc) => {
+                let vertex = &self.graph.vertices[arc.other.value];
+                let mut sorted_arcs = vertex.arcs.clone();
+                sorted_arcs.sort_unstable_by_key(|arc| arc.weight);
+                for arc in sorted_arcs {
+                    self.stack.push(arc);
                 }
-                self.visited[incidence.other.value] = true;
+                self.visited[arc.other.value] = true;
                 Some(&vertex)
             },
             _ => None
@@ -224,13 +224,13 @@ impl <A : fmt::Display> fmt::Display for DirectedGraph<A> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let _ = writeln!(f, "Graph of {} vertices:", self.vertices.len());
         for vertex in self.vertices.iter() {
-            for incidence in vertex.adjacents.iter() {
+            for arc in vertex.arcs.iter() {
                 let _ = writeln!(f, "\t ({}:{}) -(weight: {})-> ({}:{})",
                                  vertex.id,
                                  self.vertex_value(vertex.id).expect("Failed to get vertex value"),
-                                 incidence.weight,
-                                 incidence.other,
-                                 self.vertex_value(incidence.other).expect("Failed to get vertex value"));
+                                 arc.weight,
+                                 arc.other,
+                                 self.vertex_value(arc.other).expect("Failed to get vertex value"));
             }
         }
         write!(f, "")
