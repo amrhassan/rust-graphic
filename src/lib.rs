@@ -2,11 +2,12 @@
 use std::fmt;
 use std::result;
 use std::collections::VecDeque;
+use std::collections::HashSet;
 
 pub type Result = result::Result<(), String>;
 
 /// A unique identifier for a vertex within a graph
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct VertexId { value: usize }
 
 /// A directed edge from a Vertex pointing to another
@@ -157,8 +158,57 @@ impl <A> DirectedGraph<A> {
         self.vertex(vertex_id).map(|vertex| vertex.arcs_in.len())
     }
 
-    fn topologically_sorted(&self) -> Vec<VertexId> {
-        panic!("TODO")
+    /// Depth-first-search
+    fn dfs(&self, from: VertexId, visited: &mut HashSet<VertexId>,
+           pre_children_visit: &mut FnMut(VertexId) -> (), post_children_visit: &mut FnMut(VertexId) -> ()) -> Result {
+        if visited.contains(&from) { return Ok(()) }
+        visited.insert(from);
+        match self.vertex(from) {
+            None => Err(format!("{:?} could not be found", from)),
+            Some(from_vertex) => {
+                pre_children_visit(from);
+                for arc_out in &from_vertex.arcs_out {
+                    let result = self.dfs(arc_out.other, visited, pre_children_visit, post_children_visit);
+                    if result.is_err() {
+                        return result;
+                    }
+                }
+                post_children_visit(from);
+                Ok(())
+            }
+        }
+    }
+
+    fn topological_order(&self) -> Vec<VertexId> {
+        let mut last_counter = self.vertices.len();
+        let mut order = Vec::new();
+        order.resize(self.vertices.len(), VertexId { value: 0 });
+        let mut visited = HashSet::with_capacity(self.vertices.len());
+
+        for vertex in &self.vertices {
+            let result = self.dfs(
+                vertex.id,
+                &mut visited,
+                &mut |_| (),
+                &mut |vertex_id| { order[last_counter-1] = vertex_id; last_counter -= 1; }
+            );
+
+            if result.is_err() {
+                panic!(result)
+            }
+        }
+        order
+    }
+
+    /// Returns an iterator over topologically-ordered vertices if the graph is acyclic
+    pub fn topologically_ordered_iter(&self) -> Option<TopologicalIterator<A>> {
+        if self.is_cyclic() {
+            None
+        } else {
+            let mut order = self.topological_order();
+            order.reverse();
+            Some(TopologicalIterator { graph: self, order: order })
+        }
     }
 }
 
@@ -252,6 +302,21 @@ impl <A : fmt::Display> fmt::Display for DirectedGraph<A> {
 impl fmt::Display for VertexId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "VertexId({})", self.value)
+    }
+}
+
+pub struct TopologicalIterator<'a, A: 'a> {
+    graph: &'a DirectedGraph<A>,
+    order: Vec<VertexId>
+}
+
+impl <'a, A> Iterator for TopologicalIterator<'a, A> {
+    type Item = &'a Vertex<A>;
+    fn next(&mut self) -> Option<&'a Vertex<A>> {
+        match self.order.pop() {
+            Some(id) => self.graph.vertex(id),
+            None => None
+        }
     }
 }
 
@@ -407,5 +472,30 @@ mod tests {
         assert_eq!(graph.out_degree(one), Some(1));
         assert_eq!(graph.in_degree(three), Some(2));
         assert_eq!(graph.out_degree(three), Some(1));
+    }
+
+    #[test]
+    fn topological_order() {
+
+        let mut graph = DirectedGraph::new();
+
+        let zero = graph.add_vertex("zero".to_string());
+        let one = graph.add_vertex("one".to_string());
+        let two = graph.add_vertex("two".to_string());
+        let three = graph.add_vertex("three".to_string());
+        let four = graph.add_vertex("four".to_string());
+        let five = graph.add_vertex("five".to_string());
+
+        let _ = graph.connect(five, two, 0);
+        let _ = graph.connect(five, zero, 0);
+        let _ = graph.connect(four, zero, 0);
+        let _ = graph.connect(four, one, 0);
+        let _ = graph.connect(two, three, 0);
+        let _ = graph.connect(three, one, 0);
+
+        assert_eq!(
+            graph.topologically_ordered_iter().expect("Turns out acyclic").map(|v| v.value.to_string()).collect::<Vec<String>>(),
+            vec!["five", "four", "two", "three", "one", "zero"]
+        )
     }
 }
