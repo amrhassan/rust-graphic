@@ -450,10 +450,10 @@ mod tests {
         let two = graph.add_vertex("two".to_string());
         let three = graph.add_vertex("three".to_string());
 
-        let _ = graph.connect(zero, one, 0);
-        let _ = graph.connect(zero, two, 0);
-        let _ = graph.connect(one, two, 0);
-        let _ = graph.connect(two, three, 0);
+        graph.connect(zero, one, 0).unwrap();
+        graph.connect(zero, two, 0).unwrap();
+        graph.connect(one, two, 0).unwrap();
+        graph.connect(two, three, 0).unwrap();
 
         assert!(!graph.is_cyclic());
 
@@ -472,12 +472,12 @@ mod tests {
         let two = graph.add_vertex("two".to_string());
         let three = graph.add_vertex("three".to_string());
 
-        let _ = graph.connect(zero, one, 0);
-        let _ = graph.connect(zero, two, 0);
-        let _ = graph.connect(one, two, 0);
-        let _ = graph.connect(two, zero, 1);
-        let _ = graph.connect(two, three, 0);
-        let _ = graph.connect(three, three, 0);
+        graph.connect(zero, one, 0).unwrap();
+        graph.connect(zero, two, 0).unwrap();
+        graph.connect(one, two, 0).unwrap();
+        graph.connect(two, zero, 1).unwrap();
+        graph.connect(two, three, 0).unwrap();
+        graph.connect(three, three, 0).unwrap();
 
         assert_eq!(graph.in_degree(two), Some(2));
         assert_eq!(graph.out_degree(two), Some(2));
@@ -499,12 +499,12 @@ mod tests {
         let four = graph.add_vertex("four".to_string());
         let five = graph.add_vertex("five".to_string());
 
-        let _ = graph.connect(five, two, 0);
-        let _ = graph.connect(five, zero, 0);
-        let _ = graph.connect(four, zero, 0);
-        let _ = graph.connect(four, one, 0);
-        let _ = graph.connect(two, three, 0);
-        let _ = graph.connect(three, one, 0);
+        graph.connect(five, two, 0).unwrap();
+        graph.connect(five, zero, 0).unwrap();
+        graph.connect(four, zero, 0).unwrap();
+        graph.connect(four, one, 0).unwrap();
+        graph.connect(two, three, 0).unwrap();
+        graph.connect(three, one, 0).unwrap();
 
         assert_eq!(
             graph.topologically_ordered_iter().expect("Turns out acyclic").map(|v| v.value.to_string()).collect::<Vec<String>>(),
@@ -523,17 +523,18 @@ mod tests {
         let four = graph.add_vertex("four".to_string());
         let five = graph.add_vertex("five".to_string());
 
-        let _ = graph.connect(zero, one, 5);
-        let _ = graph.connect(zero, two, 3);
-        let _ = graph.connect(one, three, 6);
-        let _ = graph.connect(one, two, 2);
-        let _ = graph.connect(two, four, 4);
-        let _ = graph.connect(two, five, 2);
-        let _ = graph.connect(two, three, 7);
-        let _ = graph.connect(three, five, 1);
-        let _ = graph.connect(three, four, -1);
-        let _ = graph.connect(four, five, -2);
+        graph.connect(zero, one, 5).unwrap();
+        graph.connect(zero, two, 3).unwrap();
+        graph.connect(one, three, 6).unwrap();
+        graph.connect(one, two, 2).unwrap();
+        graph.connect(two, four, 4).unwrap();
+        graph.connect(two, five, 2).unwrap();
+        graph.connect(two, three, 7).unwrap();
+        graph.connect(three, five, 1).unwrap();
+        graph.connect(three, four, -1).unwrap();
+        graph.connect(four, five, -2).unwrap();
 
-        assert_eq!(graph.longest_distance_from(one), Some((five, 10)))
+        println!("{:?}", graph.longest_distance_from(one));
+        assert_eq!(graph.longest_distance_from(one), Some((five, 10)));
     }
 }
