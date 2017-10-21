@@ -89,8 +89,8 @@ impl <A> DirectedGraph<A> {
         Ok(())
     }
 
-    /// Iterate over values in breadth-first order
-    pub fn breadth_first_iter(&self, from: VertexId) -> BFDirectedGraphIterator<A> {
+    /// Iterate over vertices in breadth-first order
+    pub fn breadth_first_iter(&self, from: VertexId) -> BFDirectedGraphIter<A> {
         let mut visited = Vec::new();
         let mut q = VecDeque::new();
 
@@ -98,19 +98,14 @@ impl <A> DirectedGraph<A> {
 
         q.push_back(Arc { other: from, weight: 0 });
 
-        BFDirectedGraphIterator {
+        BFDirectedGraphIter {
             graph: self,
             visited: visited,
             q: q
         }
     }
 
-    /// Iterate over values in depth-first order
-    pub fn depth_first_values_iter(&self, from: VertexId) -> DFDirectedGraphValueIterator<A> {
-        DFDirectedGraphValueIterator { iter: self.depth_first_iter(from) }
-    }
-
-    pub fn depth_first_iter(&self, from: VertexId) -> DFDirectedGraphIterator<A> {
+    pub fn depth_first_iter(&self, from: VertexId) -> DFDirectedGraphIter<A> {
 
         let mut visited = Vec::new();
         let mut stack = Vec::new();
@@ -119,7 +114,7 @@ impl <A> DirectedGraph<A> {
 
         stack.push(Arc { other: from, weight: 0 });
 
-        DFDirectedGraphIterator {
+        DFDirectedGraphIter {
             graph: self,
             visited: visited,
             stack: stack
@@ -203,13 +198,13 @@ impl <A> DirectedGraph<A> {
     }
 
     /// Returns an iterator over topologically-ordered vertices if the graph is acyclic
-    pub fn topologically_ordered_iter(&self) -> Option<TopologicalIterator<A>> {
+    pub fn topologically_ordered_iter(&self) -> Option<TopologicalIter<A>> {
         if self.is_cyclic() {
             None
         } else {
             let mut order = self.topological_order();
             order.reverse();
-            Some(TopologicalIterator { graph: self, order: order })
+            Some(TopologicalIter { graph: self, order: order })
         }
     }
 
@@ -243,15 +238,15 @@ impl <A> DirectedGraph<A> {
 }
 
 /// Breadth-first Graph Iterator
-pub struct BFDirectedGraphIterator<'a, A : 'a> {
+pub struct BFDirectedGraphIter<'a, A : 'a> {
     graph: &'a DirectedGraph<A>,
     visited: Vec<bool>,
     q: VecDeque<Arc>
 }
 
-impl <'a, A> Iterator for BFDirectedGraphIterator<'a, A> {
-    type Item = &'a A;
-    fn next(&mut self) -> Option<&'a A> {
+impl <'a, A> Iterator for BFDirectedGraphIter<'a, A> {
+    type Item = &'a Vertex<A>;
+    fn next(&mut self) -> Option<&'a Vertex<A>> {
         match self.q.pop_front() {
             Some(arc) if self.visited[arc.other.value] => {
                 self.next()
@@ -264,7 +259,7 @@ impl <'a, A> Iterator for BFDirectedGraphIterator<'a, A> {
                     self.q.push_back(arc);
                 }
                 self.visited[arc.other.value] = true;
-                Some(&vertex.value)
+                Some(&vertex)
             },
             _ => None
         }
@@ -272,13 +267,13 @@ impl <'a, A> Iterator for BFDirectedGraphIterator<'a, A> {
 }
 
 /// Depth-first Graph Iterator
-pub struct DFDirectedGraphIterator<'a, A : 'a> {
+pub struct DFDirectedGraphIter<'a, A : 'a> {
     graph: &'a DirectedGraph<A>,
     visited: Vec<bool>,
     stack: Vec<Arc>
 }
 
-impl <'a, A> Iterator for DFDirectedGraphIterator<'a, A> {
+impl <'a, A> Iterator for DFDirectedGraphIter<'a, A> {
     type Item = &'a Vertex<A>;
     fn next(&mut self) -> Option<&'a Vertex<A>> {
         match self.stack.pop() {
@@ -297,18 +292,6 @@ impl <'a, A> Iterator for DFDirectedGraphIterator<'a, A> {
             },
             _ => None
         }
-    }
-}
-
-/// Depth-first Graph Iterator
-pub struct DFDirectedGraphValueIterator<'a, A : 'a> {
-    iter: DFDirectedGraphIterator<'a, A>
-}
-
-impl <'a, A> Iterator for DFDirectedGraphValueIterator<'a, A> {
-    type Item = &'a A;
-    fn next(&mut self) -> Option<&'a A> {
-        self.iter.next().map(|vertex| &vertex.value)
     }
 }
 
@@ -335,12 +318,12 @@ impl fmt::Display for VertexId {
     }
 }
 
-pub struct TopologicalIterator<'a, A: 'a> {
+pub struct TopologicalIter<'a, A: 'a> {
     graph: &'a DirectedGraph<A>,
     order: Vec<VertexId>
 }
 
-impl <'a, A> Iterator for TopologicalIterator<'a, A> {
+impl <'a, A> Iterator for TopologicalIter<'a, A> {
     type Item = &'a Vertex<A>;
     fn next(&mut self) -> Option<&'a Vertex<A>> {
         match self.order.pop() {
@@ -418,7 +401,7 @@ mod tests {
         let _ = graph.connect(three, three, 1);
 
         assert_eq!(
-            graph.breadth_first_iter(two).collect::<Vec<&String>>(),
+            graph.breadth_first_iter(two).map(|vertex| &vertex.value).collect::<Vec<&String>>(),
             vec!["two", "zero", "three", "one"]
         )
     }
@@ -440,7 +423,7 @@ mod tests {
         let _ = graph.connect(three, three, 0);
 
         assert_eq!(
-            graph.depth_first_values_iter(two).collect::<Vec<&String>>(),
+            graph.depth_first_iter(two).map(|vertex| &vertex.value).collect::<Vec<&String>>(),
             vec!["two", "zero", "one", "three"]
         )
     }
