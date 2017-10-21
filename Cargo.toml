@@ -1,6 +1,6 @@
 [package]
 name = "graphic"
-version = "0.0.1-alpha.1"
+version = "0.0.1-alpha.2"
 authors = ["Amr Hassan <amr.hassan@gmail.com>"]
 description = "In-memory graph data structures and some of its operations"
 license = "MIT"
