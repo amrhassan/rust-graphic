@@ -208,30 +208,22 @@ impl <A> DirectedGraph<A> {
         }
     }
 
-    /// Returns a vertex with the weight of the path to it
-    pub fn longest_distance_from(&self, source: VertexId) -> Option<(VertexId, i64)> {
+    /// Returns the longest distance from the source to each other reachable vertex
+    pub fn longest_distance_from(&self, source: VertexId) -> Option<HashMap<VertexId, i64>> {
         let mut distances = HashMap::new();
-        for vertex in &self.vertices {
-            distances.insert(vertex.id, i64::MIN);
-        }
         distances.insert(source, 0);
         match self.topologically_ordered_iter() {
             None => None,
             Some(iter) => {
                 for vertex in iter {
                     for arc in &vertex.arcs_out {
-                        let other_distance = distances.get(&vertex.id).unwrap() + &arc.weight;
-                        if distances.get(&arc.other).unwrap() < &other_distance {
+                        let other_distance = distances.get(&vertex.id).unwrap_or(&i64::MIN) + &arc.weight;
+                        if distances.get(&arc.other).unwrap_or(&i64::MIN) < &other_distance {
                             distances.insert(arc.other, other_distance);
                         }
                     }
                 }
-                let mut distances_vec: Vec<(&VertexId, &i64)> = distances.iter().collect();
-                distances_vec.sort_by_key(|&(&_, &distance)| distance);
-                match distances_vec.last() {
-                    None => None,
-                    Some(&(&vertex_id, &distance)) => Some((vertex_id, distance))
-                }
+                Some(distances)
             }
         }
     }
@@ -534,7 +526,11 @@ mod tests {
         graph.connect(three, four, -1).unwrap();
         graph.connect(four, five, -2).unwrap();
 
-        println!("{:?}", graph.longest_distance_from(one));
-        assert_eq!(graph.longest_distance_from(one), Some((five, 10)));
+        assert_eq!(graph.longest_distance_from(one).unwrap().get(&zero), None);
+        assert_eq!(graph.longest_distance_from(one).unwrap()[&one], 0);
+        assert_eq!(graph.longest_distance_from(one).unwrap()[&two], 2);
+        assert_eq!(graph.longest_distance_from(one).unwrap()[&three], 9);
+        assert_eq!(graph.longest_distance_from(one).unwrap()[&four], 8);
+        assert_eq!(graph.longest_distance_from(one).unwrap()[&five], 10);
     }
 }
