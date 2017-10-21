@@ -3,6 +3,8 @@ use std::fmt;
 use std::result;
 use std::collections::VecDeque;
 use std::collections::HashSet;
+use std::collections::HashMap;
+use std::i64;
 
 pub type Result = result::Result<(), String>;
 
@@ -14,7 +16,7 @@ pub struct VertexId { value: usize }
 #[derive(Debug, Copy, Clone)]
 pub struct Arc {
     other: VertexId,
-    weight: u64
+    weight: i64
 }
 
 /// A vertex in a graph
@@ -65,7 +67,7 @@ impl <A> DirectedGraph<A> {
     }
 
     /// Connects two vertices
-    pub fn connect(&mut self, from: VertexId, to: VertexId, weight: u64) -> Result {
+    pub fn connect(&mut self, from: VertexId, to: VertexId, weight: i64) -> Result {
         {
             match self.vertex_mut(from) {
                 Some(from_vertex) => {
@@ -210,6 +212,34 @@ impl <A> DirectedGraph<A> {
             Some(TopologicalIterator { graph: self, order: order })
         }
     }
+
+    /// Returns a vertex with the weight of the path to it
+    pub fn longest_distance_from(&self, source: VertexId) -> Option<(VertexId, i64)> {
+        let mut distances = HashMap::new();
+        for vertex in &self.vertices {
+            distances.insert(vertex.id, i64::MIN);
+        }
+        distances.insert(source, 0);
+        match self.topologically_ordered_iter() {
+            None => None,
+            Some(iter) => {
+                for vertex in iter {
+                    for arc in &vertex.arcs_out {
+                        let other_distance = distances.get(&vertex.id).unwrap() + &arc.weight;
+                        if distances.get(&arc.other).unwrap() < &other_distance {
+                            distances.insert(arc.other, other_distance);
+                        }
+                    }
+                }
+                let mut distances_vec: Vec<(&VertexId, &i64)> = distances.iter().collect();
+                distances_vec.sort_by_key(|&(&_, &distance)| distance);
+                match distances_vec.last() {
+                    None => None,
+                    Some(&(&vertex_id, &distance)) => Some((vertex_id, distance))
+                }
+            }
+        }
+    }
 }
 
 /// Breadth-first Graph Iterator
@@ -328,7 +358,7 @@ pub struct UndirectedGraph<A> {
 impl <A> UndirectedGraph<A> {
 
     /// Connects two vertices bidirectionally
-    pub fn connect_undirected(&mut self, one: VertexId, other: VertexId, weight: u64) -> Result {
+    pub fn connect_undirected(&mut self, one: VertexId, other: VertexId, weight: i64) -> Result {
         match self.directed.connect(one, other, weight) {
             Ok(()) => self.directed.connect(other, one, weight),
             err => err
@@ -497,5 +527,30 @@ mod tests {
             graph.topologically_ordered_iter().expect("Turns out acyclic").map(|v| v.value.to_string()).collect::<Vec<String>>(),
             vec!["five", "four", "two", "three", "one", "zero"]
         )
+    }
+
+    #[test]
+    fn longest_path() {
+        let mut graph = DirectedGraph::new();
+
+        let zero = graph.add_vertex("zero".to_string());
+        let one = graph.add_vertex("one".to_string());
+        let two = graph.add_vertex("two".to_string());
+        let three = graph.add_vertex("three".to_string());
+        let four = graph.add_vertex("four".to_string());
+        let five = graph.add_vertex("five".to_string());
+
+        let _ = graph.connect(zero, one, 5);
+        let _ = graph.connect(zero, two, 3);
+        let _ = graph.connect(one, three, 6);
+        let _ = graph.connect(one, two, 2);
+        let _ = graph.connect(two, four, 4);
+        let _ = graph.connect(two, five, 2);
+        let _ = graph.connect(two, three, 7);
+        let _ = graph.connect(three, five, 1);
+        let _ = graph.connect(three, four, -1);
+        let _ = graph.connect(four, five, -2);
+
+        assert_eq!(graph.longest_distance_from(one), Some((five, 10)))
     }
 }
