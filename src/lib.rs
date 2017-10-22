@@ -62,7 +62,7 @@ impl <A> DirectedGraph<A> {
     /// Retrieves the vertex value from the graph
     pub fn add_vertex(&mut self, value: A) -> VertexId {
         let id = VertexId { value: self.vertices.len() };
-        self.vertices.push(Vertex { value: value, arcs_out: Vec::new(), arcs_in: Vec::new(), id: id });
+        self.vertices.push(Vertex { value: value, arcs_out: Vec::new(), arcs_in: Vec::new(), id });
         id
     }
 
@@ -71,7 +71,7 @@ impl <A> DirectedGraph<A> {
         {
             match self.vertex_mut(from) {
                 Some(from_vertex) => {
-                    let arc = Arc { other: to, weight: weight };
+                    let arc = Arc { other: to, weight };
                     from_vertex.arcs_out.push(arc);
                 },
                 None => return Err(format!("{:?} does not exist", from))
@@ -80,7 +80,7 @@ impl <A> DirectedGraph<A> {
         {
             match self.vertex_mut(to) {
                 Some(to_vertex) => {
-                    let arc = Arc { other: from, weight: weight };
+                    let arc = Arc { other: from, weight };
                     to_vertex.arcs_in.push(arc);
                 },
                 None => return Err(format!("{:?} does not exist", from))
@@ -204,7 +204,7 @@ impl <A> DirectedGraph<A> {
         } else {
             let mut order = self.topological_order();
             order.reverse();
-            Some(TopologicalIter { graph: self, order: order })
+            Some(TopologicalIter { graph: self, order })
         }
     }
 
