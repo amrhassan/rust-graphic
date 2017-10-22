@@ -68,24 +68,8 @@ impl <A> DirectedGraph<A> {
 
     /// Connects two vertices
     pub fn connect(&mut self, from: VertexId, to: VertexId, weight: i64) -> Result {
-        {
-            match self.vertex_mut(from) {
-                Some(from_vertex) => {
-                    let arc = Arc { other: to, weight };
-                    from_vertex.arcs_out.push(arc);
-                },
-                None => return Err(format!("{:?} does not exist", from))
-            }
-        }
-        {
-            match self.vertex_mut(to) {
-                Some(to_vertex) => {
-                    let arc = Arc { other: from, weight };
-                    to_vertex.arcs_in.push(arc);
-                },
-                None => return Err(format!("{:?} does not exist", from))
-            }
-        }
+        self.vertex_mut(from).ok_or(format!("{:?} does not exist", from))?.arcs_out.push(Arc { other: to, weight });
+        self.vertex_mut(to).ok_or(format!("{:?} does not exist", from))?.arcs_in.push(Arc { other: from, weight });
         Ok(())
     }
 
